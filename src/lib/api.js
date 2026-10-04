@@ -40,6 +40,7 @@ export async function connectBackend() {
       providerLabel: health.providerLabel,
       model: health.model,
       adminProtected: health.adminProtected,
+      storage: health.storage,
       stats: outcomes.stats,
       verifiedAt: outcomes.verifiedAt,
     }

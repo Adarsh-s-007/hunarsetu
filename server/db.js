@@ -8,7 +8,8 @@ import { fileURLToPath } from 'node:url'
 import { buildRawSources, verifyOutcomes, RULES } from '../src/data/outcomes.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const DATA_DIR = process.env.HUNARSETU_DATA_DIR ?? path.join(here, '.data')
+// Vercel only allows writing to /tmp (temporary); everywhere else the file sits next to the server.
+const DATA_DIR = process.env.HUNARSETU_DATA_DIR ?? (process.env.VERCEL ? '/tmp/hunarsetu' : path.join(here, '.data'))
 const SEED_VERSION = '2026-10-04.1'
 
 let db
@@ -156,6 +157,11 @@ export function liveAnalytics() {
     .prepare('SELECT * FROM sessions ORDER BY updated_at DESC LIMIT 2000')
     .all()
     .map((r) => ({ ...r, members: JSON.parse(r.members), concerns: JSON.parse(r.concerns), stance: JSON.parse(r.stance) }))
+  return summariseSessions(rows)
+}
+
+// Dashboard figures from session rows (newest first). Shared with the Redis store (store.js).
+export function summariseSessions(rows) {
   const byMandal = {}
   const objectionsByRole = {}
   const stanceByRole = {}
@@ -209,11 +215,11 @@ export function liveAnalytics() {
 
 // Phone numbers are kept only while a call is pending: masked once the request is Resolved
 // (data minimisation, DPDP Act). Only signed-in counsellors can read them.
-const maskPhone = (p) => (p ? String(p).replace(/\D/g, '').replace(/^(\d{2})\d+(\d{4})$/, '$1xxxx$2') : null)
+export const maskPhone = (p) => (p ? String(p).replace(/\D/g, '').replace(/^(\d{2})\d+(\d{4})$/, '$1xxxx$2') : null)
 
 // Short ticket numbers families can read out on the phone (no 0/O or 1/I mix-ups).
 const TICKET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-const newTicket = () => `HS-${Array.from({ length: 6 }, () => TICKET[Math.floor(Math.random() * TICKET.length)]).join('')}`
+export const newTicket = () => `HS-${Array.from({ length: 6 }, () => TICKET[Math.floor(Math.random() * TICKET.length)]).join('')}`
 
 export function addEscalation(e) {
   const d = getDb()

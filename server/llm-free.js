@@ -126,12 +126,15 @@ function oneAtATime(fn) {
   return run
 }
 
-async function callModel(provider, messages) {
-  if (!FREE_PROVIDERS[provider].keyEnv) return oneAtATime(() => sendToModel(provider, messages))
-  return sendToModel(provider, messages)
+async function callModel(provider, messages, deadline) {
+  if (!FREE_PROVIDERS[provider].keyEnv) return oneAtATime(() => sendToModel(provider, messages, deadline))
+  return sendToModel(provider, messages, deadline)
 }
 
-async function sendToModel(provider, messages) {
+async function sendToModel(provider, messages, deadline = Infinity) {
+  // Never run past the turn's hard deadline (Vercel stops a function after 60 s).
+  const timeLeft = Math.min(45_000, deadline - Date.now())
+  if (timeLeft < 6_000) throw Object.assign(new Error('out of time for this turn'), { status: 503 })
   const cfg = FREE_PROVIDERS[provider]
   const headers = { 'content-type': 'application/json' }
   if (cfg.keyEnv) headers.authorization = `Bearer ${process.env[cfg.keyEnv]}`
@@ -139,7 +142,7 @@ async function sendToModel(provider, messages) {
   if (cfg.jsonMode) body.response_format = { type: 'json_object' }
   if (cfg.lowReasoning) body.reasoning_effort = 'low' // reasoning models: think briefly, answer sooner
   const ac = new AbortController()
-  const timer = setTimeout(() => ac.abort(), 45_000)
+  const timer = setTimeout(() => ac.abort(), timeLeft)
   try {
     const res = await fetch(cfg.url, { method: 'POST', headers, body: JSON.stringify(body), signal: ac.signal })
     const raw = await res.text()
@@ -208,7 +211,9 @@ function fromText(reply, text) {
 }
 
 // The family sees "checking the numbers" while we wait; after this long, the offline engine answers instead.
-const TURN_BUDGET_MS = 55_000
+// On Vercel the whole turn must finish inside the function's 60-second limit.
+const TURN_BUDGET_MS = process.env.VERCEL ? 35_000 : 55_000
+const TURN_HARD_LIMIT_MS = process.env.VERCEL ? 52_000 : 100_000
 
 export async function counselWithFreeAI({ text, role, profile, family, history = [], lang = 'en', replyLang = { lang, roman: false } }) {
   const order = freeProviderOrder(replyLang.lang)
@@ -235,7 +240,7 @@ export async function counselWithFreeAI({ text, role, profile, family, history =
     for (let attempt = 1; attempt <= 6 && Date.now() - turnStarted < TURN_BUDGET_MS; attempt++) {
       const started = Date.now()
       try {
-        const { content, model, finish } = await callModel(provider, messages)
+        const { content, model, finish } = await callModel(provider, messages, turnStarted + TURN_HARD_LIMIT_MS)
         const out = parseReply(content, text)
         if (!out) throw new Error(`unreadable reply (finish=${finish}, ${content.length} chars: ${JSON.stringify(content.slice(0, 160))})`)
         if (!replyMatches(out.reply, replyLang)) {

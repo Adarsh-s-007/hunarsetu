@@ -509,7 +509,7 @@ function TrustPanel() {
 }
 
 export default function Admin() {
-  const { L } = useApp()
+  const { L, backend } = useApp()
   const [period, setPeriod] = useState(90)
   const [metric, setMetric] = useState('resistance')
   const [selected, setSelected] = useState('nadikuda')
@@ -663,6 +663,13 @@ export default function Admin() {
             </a>
           ))}
         </nav>
+
+        {backend?.storage === 'temporary' && (
+          <p className="notice">
+            <Lock size={16} aria-hidden="true" /> Saved data on this server is temporary: call requests and live families can disappear when Vercel restarts it. To keep them,
+            connect Upstash Redis in your Vercel project (Storage tab), then redeploy.
+          </p>
+        )}
 
         <div className="kpi-grid kpi-4">
           <Kpi label="Families helped" value={num(KPIS.sessions * scale)} delta={`${Math.round(KPIS.sessionsDelta * 100)}% more than before`} good />

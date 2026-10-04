@@ -109,13 +109,24 @@ The API also limits how fast each visitor can send requests, and validates every
 
 ## Deploy for free
 
-Any Node host works. For example, on Render's free web service:
+### Vercel
+
+The repo is ready for Vercel: `vercel.json` builds the site with Vite and runs the whole API as one Vercel Function (`api/index.js`), with up to 60 seconds per request so slow free-AI answers can finish.
+
+1. On vercel.com, choose **Add New → Project** and import this GitHub repo. Keep the detected settings (`vercel.json` sets them).
+2. Under **Environment Variables**, add `ADMIN_PASSWORD` with your password. Type it **without quotes**; quotes are only needed inside a `.env` file. Optionally add a free `GEMINI_API_KEY` or `GROQ_API_KEY` for faster answers.
+3. **Keep call requests and live families (recommended):** in the project, open **Storage → Create / Connect → Upstash for Redis** (free plan) and connect it to the project. Vercel adds `KV_REST_API_URL` and `KV_REST_API_TOKEN` for you. You can also paste `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` from an Upstash account yourself.
+4. Deploy (or **Redeploy** after adding storage or variables).
+
+Without step 3 the site still works, but Vercel only keeps files for a short time: call requests and the dashboard's live families can disappear, and the dashboard says so. The course and pay data is rebuilt automatically on every start either way.
+
+### Render (or any always-on Node server)
 
 1. Build command: `npm install && npm run build`
 2. Start command: `npm start`
-3. Add `ADMIN_PASSWORD` (and a free `GROQ_API_KEY` if you have one) as environment variables.
+3. Add `ADMIN_PASSWORD` (and a free AI key if you have one) as environment variables.
 
-The SQLite file lives in `server/.data`. On free hosts that disk may reset on redeploy; the outcome data is rebuilt automatically, but live sessions are lost.
+Data is saved in `server/.data`. On free plans that disk is reset on redeploys and restarts; connect Upstash Redis (the same two variables as above) to keep call requests and live families.
 
 ## Credits
 

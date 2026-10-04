@@ -22,7 +22,8 @@ export default defineConfig(({ mode }) => {
   for (const key of [
     'ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'HUNARSETU_MODEL', 'HUNARSETU_LLM',
     'GROQ_API_KEY', 'GROQ_MODEL', 'GEMINI_API_KEY', 'GEMINI_MODEL', 'POLLINATIONS_MODEL',
-    'LLM_PROVIDER', 'HUNARSETU_FREE_AI', 'ADMIN_PASSWORD',
+    'LLM_PROVIDER', 'HUNARSETU_FREE_AI', 'ADMIN_PASSWORD', 'HUNARSETU_DATA_DIR',
+    'KV_REST_API_URL', 'KV_REST_API_TOKEN', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN',
   ]) {
     if (env[key] && !process.env[key]) process.env[key] = env[key]
   }

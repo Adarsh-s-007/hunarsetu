@@ -2,10 +2,8 @@
 import express from 'express'
 import crypto from 'node:crypto'
 import Anthropic from '@anthropic-ai/sdk'
-import {
-  publishedPayload, provenance, runVerification, upsertSession, liveAnalytics, addEscalation, listEscalations,
-  updateEscalation, escalationStatus, ESCALATION_STATUSES,
-} from './db.js'
+import { publishedPayload, provenance, runVerification, ESCALATION_STATUSES } from './db.js'
+import { upsertSession, liveAnalytics, addEscalation, listEscalations, updateEscalation, escalationStatus, storageKind } from './store.js'
 import { counselWithClaude, claudeConfigured, LlmUnavailable, MODEL, ALLOWED } from './llm.js'
 import { counselWithFreeAI, freeProviderOrder, FREE_PROVIDERS } from './llm-free.js'
 import { detectLang } from '../src/lib/langdetect.js'
@@ -91,7 +89,8 @@ const requireAdmin = (req, res, next) => (isAdmin(req) ? next() : res.status(401
 
 export function createApp() {
   const app = express()
-  app.set('trust proxy', 'loopback')
+  // Behind Vercel's proxy, trust its forwarded IP and https (rate limits, secure sign-in cookie).
+  app.set('trust proxy', process.env.VERCEL ? true : 'loopback')
   app.use(express.json({ limit: '100kb' }))
   app.use((_req, res, next) => {
     res.set({ 'x-content-type-options': 'nosniff', 'referrer-policy': 'strict-origin-when-cross-origin', 'cache-control': 'no-store' })
@@ -111,6 +110,7 @@ export function createApp() {
       outcomes: stats,
       verifiedAt,
       adminProtected: !!process.env.ADMIN_PASSWORD,
+      storage: storageKind,
     })
   })
 
@@ -187,14 +187,14 @@ export function createApp() {
   })
 
   // ----- Engagement & sentiment tracking (anonymised) -----
-  app.post('/sessions', limit(120, 60_000), (req, res) => {
+  app.post('/sessions', limit(120, 60_000), async (req, res) => {
     const b = req.body ?? {}
     const id = str(b.id, 64)
     if (!/^[\w-]{8,64}$/.test(id)) return res.status(400).json({ error: 'bad_id' })
     const profile = cleanProfile(b.profile)
     const family = cleanFamily(b.family) ?? { stance: {}, concerns: [] }
     const vals = Object.values(family.stance)
-    upsertSession({
+    await upsertSession({
       id,
       startedAt: Number(b.startedAt) || Date.now(),
       district: profile.district,
@@ -211,14 +211,14 @@ export function createApp() {
     })
     res.json({ ok: true })
   })
-  app.get('/analytics/live', requireAdmin, (_req, res) => res.json(liveAnalytics()))
+  app.get('/analytics/live', requireAdmin, async (_req, res) => res.json(await liveAnalytics()))
 
   // ----- Human escalation -----
-  app.post('/escalations', limit(8, 10 * 60_000), (req, res) => {
+  app.post('/escalations', limit(8, 10 * 60_000), async (req, res) => {
     const b = req.body ?? {}
     const phone = str(b.phone, 20).replace(/\s/g, '')
     if (b.kind !== 'chat' && !/^[6-9]\d{9}$/.test(phone)) return res.status(400).json({ error: 'bad_phone' })
-    const id = addEscalation({
+    const id = await addEscalation({
       sessionId: str(b.sessionId, 64) || null,
       kind: oneOf(b.kind, ['call', 'ambassador', 'chat'], 'call'),
       district: oneOf(b.district, ALLOWED.DISTRICT_IDS, null),
@@ -234,16 +234,16 @@ export function createApp() {
     })
     res.json({ id })
   })
-  app.get('/escalations/:id/status', limit(30, 60_000), (req, res) => {
-    const s = escalationStatus(str(req.params.id, 20))
+  app.get('/escalations/:id/status', limit(30, 60_000), async (req, res) => {
+    const s = await escalationStatus(str(req.params.id, 20))
     if (!s) return res.status(404).json({ error: 'not_found' })
     res.json(s)
   })
-  app.get('/escalations', requireAdmin, (_req, res) => res.json(listEscalations(50)))
-  app.patch('/escalations/:id', requireAdmin, (req, res) => {
+  app.get('/escalations', requireAdmin, async (_req, res) => res.json(await listEscalations(50)))
+  app.patch('/escalations/:id', requireAdmin, async (req, res) => {
     const status = req.body?.status === undefined ? undefined : oneOf(req.body.status, ESCALATION_STATUSES, null)
     if (status === null) return res.status(400).json({ error: 'bad_status' })
-    const ok = updateEscalation(str(req.params.id, 20), { status, note: req.body?.note === undefined ? undefined : str(req.body.note, 500) })
+    const ok = await updateEscalation(str(req.params.id, 20), { status, note: req.body?.note === undefined ? undefined : str(req.body.note, 500) })
     if (!ok) return res.status(404).json({ error: 'not_found' })
     res.json({ ok: true })
   })
