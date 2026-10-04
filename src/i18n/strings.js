@@ -13,7 +13,7 @@ export const S = {
   'nav.simulator': { en: 'Compare choices', hi: 'विकल्पों की तुलना', te: 'ఎంపికలు పోల్చండి' },
   'nav.counsellor': { en: 'Talk to a person', hi: 'किसी से बात करें', te: 'వ్యక్తితో మాట్లాడండి' },
   'nav.admin': { en: 'Admin', hi: 'एडमिन', te: 'అడ్మిన్' },
-  'nav.adminHint': { en: 'Admin dashboard for officials (password needed)', hi: 'अधिकारियों का एडमिन डैशबोर्ड (पासवर्ड ज़रूरी)', te: 'అధికారుల అడ్మిన్ డాష్‌బోర్డ్ (పాస్‌వర్డ్ అవసరం)' },
+  'nav.adminHint': { en: 'Admin dashboard for officials', hi: 'अधिकारियों का एडमिन डैशबोर्ड', te: 'అధికారుల అడ్మిన్ డాష్‌బోర్డ్' },
   'nav.path': { en: 'Your path, step by step', hi: 'आपका रास्ता, कदम-दर-कदम', te: 'మీ దారి, ఒక్కో అడుగు' },
   'nav.pathShort': { en: 'Your path', hi: 'आपका रास्ता', te: 'మీ దారి' },
   'nav.pact': { en: 'Family plan', hi: 'परिवार की योजना', te: 'కుటుంబ ప్రణాళిక' },

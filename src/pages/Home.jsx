@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
-  ArrowRight, MessageCircle, Users, Lock, BadgeCheck, Ban, Mic, Headset, LayoutDashboard, Pause, Play, Send, Route, BriefcaseBusiness, ChevronDown, Minus, X, Check, Volume2, Pointer, ALargeSmall,
+  ArrowRight, MessageCircle, Users, BadgeCheck, Ban, Mic, Headset, LayoutDashboard, Pause, Play, Send, Route, BriefcaseBusiness, ChevronDown, Minus, X, Check, Volume2, Pointer, ALargeSmall,
 } from 'lucide-react'
 import { useApp } from '../AppContext'
 import { bestProvider, VERIFICATION } from '../data/outcomes.js'
@@ -428,10 +428,10 @@ function Officials() {
               <div>
                 <h3>Admin dashboard</h3>
                 <p className="muted">
-                  Where and why families say no, the families waiting for a call, and the number checks. Officials sign in with the admin password.
+                  Where and why families say no, the families waiting for a call, and the number checks. Open to everyone in this prototype.
                 </p>
                 <Link to="/admin" className="btn btn-dark btn-sm">
-                  <Lock size={14} aria-hidden="true" /> Open the admin dashboard
+                  <LayoutDashboard size={14} aria-hidden="true" /> Open the admin dashboard
                 </Link>
               </div>
               <div>

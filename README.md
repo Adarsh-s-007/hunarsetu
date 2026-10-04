@@ -70,9 +70,9 @@ The same rules hand a family over to a real person when someone is in distress, 
 | Family plan, printable | `/pact` |
 | How we check the numbers: every centre, what it claimed, what past students said, and the label families see | `/numbers` |
 | Talk to a person: "What happens next" steps, call-back request, and request-status check (`?ticket=HS-…` fills it in) | `/counsellor` |
-| Admin (password needed): 7 sections (where, why, calls to make, getting better?, what works, live families, number checks) | `/admin` |
+| Admin (open to everyone in this prototype): 7 sections (where, why, calls to make, getting better?, what works, live families, number checks) | `/admin` |
 
-**Admin dashboard:** open it with the **Admin** button in the top bar (or `/admin`). It always needs the password set as `ADMIN_PASSWORD` in `.env`; put the value in quotes if it contains `#`. Without a password the dashboard stays locked. The page shows nothing before sign-in, and the server sends live data (the call list, phone numbers and live families) only to a signed-in admin. The example map and chart figures are part of the site's code. A sign-in lasts 12 hours, and **Sign out** is at the top of the dashboard.
+**Admin dashboard:** open it with the **Admin** button in the top bar (or `/admin`). It is open to everyone, because this is a prototype. For the same reason, phone numbers from call-back requests are only ever stored and shown hidden (98xxxx3210).
 
 **Hand-over to a person:** when the chat hands a family over, the family can type a phone number right in the chat. That joins the chat's own request, so there is one request per family. Counsellors change its status (Waiting, Called, Resolved), and the family sees it under the chat or by checking its request number.
 
@@ -104,7 +104,7 @@ The API also limits how fast each visitor can send requests, and validates every
 - **Illustrative sample data:** outcome figures per centre (pay, jobs, tracer calls) and the dashboard's baseline, both generated deterministically. The site says so on every data page. In production they would come from SIDH, DGT-ITI MIS, NCS and real tracer calls.
 - **What's stored:**
   - Sessions keep anonymised signals only: no names, phone numbers or message text.
-  - Call-back requests keep the phone number only until the request is marked Resolved; after that only the last 4 digits are kept. Only signed-in officials can see it.
+  - Call-back requests keep only a hidden phone number (first 2 and last 4 digits), since the prototype's dashboard is open to everyone.
 - **What leaves the server:** family messages are sent to whichever AI service is answering. Free tiers may log requests. For a real deployment, use a provider with a data agreement, or set `HUNARSETU_FREE_AI=off` to stop using the keyless service.
 
 ## Deploy for free
@@ -114,7 +114,7 @@ The API also limits how fast each visitor can send requests, and validates every
 The repo is ready for Vercel: `vercel.json` builds the site with Vite and runs the whole API as one Vercel Function (`api/index.js`), with up to 60 seconds per request so slow free-AI answers can finish.
 
 1. On vercel.com, choose **Add New → Project** and import this GitHub repo. Keep the detected settings (`vercel.json` sets them).
-2. Under **Environment Variables**, add `ADMIN_PASSWORD` with your password. Type it **without quotes**; quotes are only needed inside a `.env` file. Optionally add a free `GEMINI_API_KEY` or `GROQ_API_KEY` for faster answers.
+2. Optionally, under **Environment Variables**, add a free `GEMINI_API_KEY` or `GROQ_API_KEY` for faster answers.
 3. **Keep call requests and live families (recommended):** in the project, open **Storage → Create / Connect → Upstash for Redis** (free plan) and connect it to the project. Vercel adds `KV_REST_API_URL` and `KV_REST_API_TOKEN` for you. You can also paste `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` from an Upstash account yourself.
 4. Deploy (or **Redeploy** after adding storage or variables).
 
@@ -124,7 +124,7 @@ Without step 3 the site still works, but Vercel only keeps files for a short tim
 
 1. Build command: `npm install && npm run build`
 2. Start command: `npm start`
-3. Add `ADMIN_PASSWORD` (and a free AI key if you have one) as environment variables.
+3. Optionally add a free AI key as an environment variable.
 
 Data is saved in `server/.data`. On free plans that disk is reset on redeploys and restarts; connect Upstash Redis (the same two variables as above) to keep call requests and live families.
 

@@ -1,8 +1,7 @@
 // HunarSetu API. Mounted at /api by the Vite dev server (vite.config.js) and by server/index.js.
 import express from 'express'
-import crypto from 'node:crypto'
 import Anthropic from '@anthropic-ai/sdk'
-import { publishedPayload, provenance, runVerification, ESCALATION_STATUSES } from './db.js'
+import { publishedPayload, provenance, runVerification, ESCALATION_STATUSES, maskPhone } from './db.js'
 import { upsertSession, liveAnalytics, addEscalation, listEscalations, updateEscalation, escalationStatus, storageKind } from './store.js'
 import { counselWithClaude, claudeConfigured, LlmUnavailable, MODEL, ALLOWED } from './llm.js'
 import { counselWithFreeAI, freeProviderOrder, FREE_PROVIDERS } from './llm-free.js'
@@ -70,26 +69,9 @@ function limit(max, windowMs) {
   }
 }
 
-// ---------- Admin sign-in (ADMIN_PASSWORD in .env; without it the dashboard stays locked) ----------
-const COOKIE = 'hs_admin'
-const adminToken = () => crypto.createHmac('sha256', process.env.ADMIN_PASSWORD).update('hunarsetu-admin-v1').digest('hex')
-const readCookie = (req, name) =>
-  (req.headers.cookie ?? '')
-    .split(';')
-    .map((c) => c.trim().split('='))
-    .find(([k]) => k === name)?.[1]
-
-function isAdmin(req) {
-  if (!process.env.ADMIN_PASSWORD) return false // no password set: nobody can open the dashboard
-  const got = readCookie(req, COOKIE) ?? ''
-  const want = adminToken()
-  return got.length === want.length && crypto.timingSafeEqual(Buffer.from(got), Buffer.from(want))
-}
-const requireAdmin = (req, res, next) => (isAdmin(req) ? next() : res.status(401).json({ error: 'sign_in_required' }))
-
 export function createApp() {
   const app = express()
-  // Behind Vercel's proxy, trust its forwarded IP and https (rate limits, secure sign-in cookie).
+  // Behind Vercel's proxy, trust its forwarded IP (per-visitor rate limits).
   app.set('trust proxy', process.env.VERCEL ? true : 'loopback')
   app.use(express.json({ limit: '100kb' }))
   app.use((_req, res, next) => {
@@ -109,7 +91,6 @@ export function createApp() {
       backups: ai.backups ?? [],
       outcomes: stats,
       verifiedAt,
-      adminProtected: !!process.env.ADMIN_PASSWORD,
       storage: storageKind,
     })
   })
@@ -121,7 +102,7 @@ export function createApp() {
     if (!p) return res.status(404).json({ error: 'not_found' })
     res.json(p)
   })
-  app.post('/outcomes/verify', requireAdmin, (_req, res) => res.json({ stats: runVerification() }))
+  app.post('/outcomes/verify', limit(5, 60_000), (_req, res) => res.json({ stats: runVerification() }))
 
   // ----- Counselling: Claude, else free AI, else 503 (the browser then uses its offline engine) -----
   app.post('/counsel', limit(30, 60_000), async (req, res) => {
@@ -211,7 +192,7 @@ export function createApp() {
     })
     res.json({ ok: true })
   })
-  app.get('/analytics/live', requireAdmin, async (_req, res) => res.json(await liveAnalytics()))
+  app.get('/analytics/live', async (_req, res) => res.json(await liveAnalytics()))
 
   // ----- Human escalation -----
   app.post('/escalations', limit(8, 10 * 60_000), async (req, res) => {
@@ -227,7 +208,8 @@ export function createApp() {
       reasons: (Array.isArray(b.reasons) ? b.reasons : []).map((r) => str(r, 30)).slice(0, 5),
       who: oneOf(b.who, ALLOWED.ROLE_KEYS, null),
       woman: !!b.woman,
-      phone: phone || null,
+      // The dashboard is open to everyone in this prototype, so only a hidden number is kept (98xxxx3210).
+      phone: maskPhone(phone) || null,
       time: oneOf(b.time, ['morning', 'afternoon', 'evening'], null),
       topics: (Array.isArray(b.topics) ? b.topics : []).filter((t) => OBJECTION_KEYS.includes(t)),
       summary: Array.isArray(b.summary) ? b.summary.slice(0, 12).map((l) => ({ k: str(l?.k, 40), v: str(l?.v, 400) })) : null,
@@ -239,28 +221,12 @@ export function createApp() {
     if (!s) return res.status(404).json({ error: 'not_found' })
     res.json(s)
   })
-  app.get('/escalations', requireAdmin, async (_req, res) => res.json(await listEscalations(50)))
-  app.patch('/escalations/:id', requireAdmin, async (req, res) => {
+  app.get('/escalations', async (_req, res) => res.json(await listEscalations(50)))
+  app.patch('/escalations/:id', limit(60, 60_000), async (req, res) => {
     const status = req.body?.status === undefined ? undefined : oneOf(req.body.status, ESCALATION_STATUSES, null)
     if (status === null) return res.status(400).json({ error: 'bad_status' })
     const ok = await updateEscalation(str(req.params.id, 20), { status, note: req.body?.note === undefined ? undefined : str(req.body.note, 500) })
     if (!ok) return res.status(404).json({ error: 'not_found' })
-    res.json({ ok: true })
-  })
-
-  // ----- Admin sign-in -----
-  app.get('/admin/me', (req, res) => res.json({ protected: !!process.env.ADMIN_PASSWORD, signedIn: isAdmin(req) }))
-  app.post('/admin/login', limit(10, 10 * 60_000), (req, res) => {
-    if (!process.env.ADMIN_PASSWORD) return res.status(503).json({ error: 'no_password_set' })
-    const given = crypto.createHash('sha256').update(str(req.body?.password, 200)).digest()
-    const want = crypto.createHash('sha256').update(process.env.ADMIN_PASSWORD).digest()
-    if (!crypto.timingSafeEqual(given, want)) return res.status(401).json({ error: 'wrong_password' })
-    const secure = req.secure ? '; Secure' : ''
-    res.set('set-cookie', `${COOKIE}=${adminToken()}; HttpOnly; SameSite=Lax; Path=/; Max-Age=43200${secure}`)
-    res.json({ ok: true })
-  })
-  app.post('/admin/logout', (_req, res) => {
-    res.set('set-cookie', `${COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`)
     res.json({ ok: true })
   })
 

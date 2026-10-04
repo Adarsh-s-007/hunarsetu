@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { MapContainer, TileLayer, CircleMarker, Tooltip } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
-import { ArrowUp, ArrowDown, Siren, Download, Flag, Radio, Lock, LogOut, Phone } from 'lucide-react'
+import { ArrowUp, ArrowDown, Siren, Download, Flag, Radio, Info } from 'lucide-react'
 import { useApp } from '../AppContext'
 import {
   MANDALS, mandalMix, OBJECTIONS_BY_ROLE, OBJECTION_ORDER, ROLE_ORDER, STANCE_SHIFT, CONVICTION_TREND, PLAYBOOK, FUNNEL, KPIS, ESCALATIONS, SUGGESTED_ACTION,
@@ -10,7 +10,7 @@ import {
 import { ROLES } from '../engine/roles'
 import { OBJECTIONS } from '../engine/taxonomy'
 import { num } from '../lib/format.js'
-import { fetchLive, adminMe, adminLogin, adminLogout, updateEscalation } from '../lib/api.js'
+import { fetchLive, updateEscalation } from '../lib/api.js'
 import { VERIFICATION, PROVIDERS, RULES } from '../data/outcomes.js'
 import { DISTRICTS } from '../data/districts.js'
 import { getTrade } from '../data/trades.js'
@@ -301,59 +301,6 @@ function Playbook() {
 const REASON_TEXT = { distress: 'Someone may be upset', lowConfidence: 'AI did not understand', unresolved: 'Same worry came back', sensitive: 'Private topic', requested: 'Asked for a person' }
 const ENGINE_NAMES = { claude: 'Claude', pollinations: 'Free AI', groq: 'Groq (free)', gemini: 'Gemini (free)', offline: 'Offline' }
 
-// Shown instead of the dashboard when it cannot be opened yet.
-function AdminLocked({ title, children }) {
-  return (
-    <div className="page">
-      <div className="container narrow">
-        <div className="panel admin-login">
-          <Lock size={28} aria-hidden="true" />
-          <h1>{title}</h1>
-          {children}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function AdminLogin({ onDone }) {
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
-  const submit = async (e) => {
-    e.preventDefault()
-    setBusy(true)
-    setError('')
-    try {
-      await adminLogin(password)
-      onDone()
-    } catch (err) {
-      setError(err.status === 429 ? 'Too many tries. Please wait a few minutes.' : 'That password is not right.')
-    } finally {
-      setBusy(false)
-    }
-  }
-  return (
-    <div className="page">
-      <div className="container narrow">
-        <form className="panel admin-login" onSubmit={submit}>
-          <Lock size={28} aria-hidden="true" />
-          <h1>Admin sign-in</h1>
-          <p className="lead">This dashboard is for officials. It shows where and why families say no, and the families waiting for a call. Enter the admin password to see it.</p>
-          <label className="field">
-            <span>Password</span>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" autoFocus />
-          </label>
-          {error && <p className="form-error">{error}</p>}
-          <button type="submit" className="btn btn-primary" disabled={!password || busy}>
-            Sign in
-          </button>
-        </form>
-      </div>
-    </div>
-  )
-}
-
 const ago = (ms) => {
   const m = Math.max(0, Math.round((Date.now() - ms) / 60000))
   return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`
@@ -515,16 +462,9 @@ export default function Admin() {
   const [selected, setSelected] = useState('nadikuda')
   const [live, setLive] = useState(null)
   const [liveEsc, setLiveEsc] = useState([])
-  const [auth, setAuth] = useState(undefined) // undefined = checking, { protected, signedIn }, null = no API
   const [tick, setTick] = useState(0)
   const reload = () => setTick((n) => n + 1)
   useEffect(() => {
-    adminMe()
-      .then(setAuth)
-      .catch(() => setAuth(null))
-  }, [tick])
-  useEffect(() => {
-    if (!auth?.signedIn) return // no data is loaded before sign-in
     let on = true
     const load = () =>
       fetchLive()
@@ -533,18 +473,14 @@ export default function Admin() {
           setLive(a)
           setLiveEsc(e)
         })
-        .catch((err) => {
-          if (!on) return
-          if (err.status === 401) setAuth({ protected: true, signedIn: false })
-          else setLive(false)
-        })
+        .catch(() => on && setLive(false))
     load()
     const id = setInterval(load, 15000)
     return () => {
       on = false
       clearInterval(id)
     }
-  }, [auth, tick])
+  }, [tick])
   const setStatus = async (id, status) => {
     await updateEscalation(id, { status }).catch(() => {})
     reload()
@@ -557,30 +493,6 @@ export default function Admin() {
   const mix = mandalMix(sel)
   const maxSessions = Math.max(...MANDALS.map((m) => m.sessions))
 
-  if (auth === undefined)
-    return (
-      <AdminLocked title="Admin">
-        <p className="lead">Checking sign-in…</p>
-      </AdminLocked>
-    )
-  if (auth === null)
-    return (
-      <AdminLocked title="Admin dashboard not available">
-        <p className="lead">
-          The dashboard needs the HunarSetu server to check the password. Start the site with <code>npm run dev</code> (or <code>npm start</code>) and open this page again.
-        </p>
-      </AdminLocked>
-    )
-  if (!auth.protected)
-    return (
-      <AdminLocked title="Set an admin password first">
-        <p className="lead">
-          The dashboard stays locked until a password is set. Add <code>ADMIN_PASSWORD="your-password"</code> to the <code>.env</code> file in the project folder, then restart the
-          site.
-        </p>
-      </AdminLocked>
-    )
-  if (!auth.signedIn) return <AdminLogin onDone={reload} />
 
   const exportCsv = () => {
     const rows = [['mandal', 'sessions', 'resistance_index', 'consent_pct', 'top_objection', 'girls_share_pct'], ...MANDALS.map((m) => [m.name, Math.round(m.sessions * scale), m.resistance, m.consent, m.top, m.girlsShare])]
@@ -638,11 +550,6 @@ export default function Admin() {
             <button type="button" className="btn btn-outline" onClick={exportCsv}>
               <Download size={16} aria-hidden="true" /> Download CSV
             </button>
-            {auth.signedIn && (
-              <button type="button" className="btn btn-text" onClick={() => adminLogout().then(reload)}>
-                <LogOut size={16} aria-hidden="true" /> Sign out
-              </button>
-            )}
           </div>
         </div>
       </section>
@@ -666,7 +573,7 @@ export default function Admin() {
 
         {backend?.storage === 'temporary' && (
           <p className="notice">
-            <Lock size={16} aria-hidden="true" /> Saved data on this server is temporary: call requests and live families can disappear when Vercel restarts it. To keep them,
+            <Info size={16} aria-hidden="true" /> Saved data on this server is temporary: call requests and live families can disappear when Vercel restarts it. To keep them,
             connect Upstash Redis in your Vercel project (Storage tab), then redeploy.
           </p>
         )}
@@ -795,7 +702,7 @@ export default function Admin() {
             <h2>3. Calls to make</h2>
             {waiting > 0 && <span className="status status-waiting">{waiting} waiting</span>}
           </div>
-          <p className="section-note">Families who asked to talk to a real person. Change the status after you call. Phone numbers are hidden once you mark a request Resolved.</p>
+          <p className="section-note">Families who asked to talk to a real person. Change the status after you call. This demo is open to everyone, so phone numbers are always shown hidden.</p>
           <ul className="call-list">
             {queue.map((e) => (
               <li key={e.id} className={`call-card ${e.status === 'Waiting' ? 'is-waiting' : ''}`}>
@@ -810,13 +717,7 @@ export default function Admin() {
                   {e.woman && <span className="call-woman">Wants a woman counsellor</span>}
                 </p>
                 <div className="call-actions">
-                  {e.live && e.phone && /^\d{10}$/.test(e.phone) ? (
-                    <a className="btn btn-primary btn-sm" href={`tel:${e.phone}`}>
-                      <Phone size={15} aria-hidden="true" /> Call {e.phone}
-                    </a>
-                  ) : (
-                    <span className="cell-sub">{!e.live ? 'Sample row' : e.phone ? `Number hidden (${e.phone})` : e.kind === 'chat' ? 'No phone yet (asked in chat)' : 'No phone given'}</span>
-                  )}
+                  <span className="cell-sub">{!e.live ? 'Sample row' : e.phone ? `Phone: ${e.phone}` : e.kind === 'chat' ? 'No phone yet (asked in chat)' : 'No phone given'}</span>
                   {e.live ? (
                     <label className="call-status">
                       <span>Status</span>

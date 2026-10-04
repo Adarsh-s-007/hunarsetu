@@ -16,13 +16,13 @@ function hunarsetuApi() {
 }
 
 export default defineConfig(({ mode }) => {
-  // Make .env values (AI keys, ADMIN_PASSWORD, ...) visible to the API code.
+  // Make .env values (AI keys, storage, ...) visible to the API code.
   // They are never exposed to the browser bundle: only VITE_* variables are.
   const env = loadEnv(mode, process.cwd(), '')
   for (const key of [
     'ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'HUNARSETU_MODEL', 'HUNARSETU_LLM',
     'GROQ_API_KEY', 'GROQ_MODEL', 'GEMINI_API_KEY', 'GEMINI_MODEL', 'POLLINATIONS_MODEL',
-    'LLM_PROVIDER', 'HUNARSETU_FREE_AI', 'ADMIN_PASSWORD', 'HUNARSETU_DATA_DIR',
+    'LLM_PROVIDER', 'HUNARSETU_FREE_AI', 'HUNARSETU_DATA_DIR',
     'KV_REST_API_URL', 'KV_REST_API_TOKEN', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN',
   ]) {
     if (env[key] && !process.env[key]) process.env[key] = env[key]

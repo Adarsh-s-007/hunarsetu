@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Link, useLocation } from 'react-router-dom'
-import { Menu, X, Accessibility, Lock } from 'lucide-react'
+import { Menu, X, Accessibility, LayoutDashboard } from 'lucide-react'
 import { useApp } from '../AppContext'
 import { LANGS } from '../i18n/strings'
 import { Wordmark } from './Logo'
@@ -62,7 +62,7 @@ export default function Navbar() {
             <span>{t('easy.on')}</span>
           </button>
           <NavLink to="/admin" className={({ isActive }) => `admin-link ${isActive ? 'is-active' : ''}`} title={t('nav.adminHint')} aria-label={t('nav.adminHint')}>
-            <Lock size={15} aria-hidden="true" />
+            <LayoutDashboard size={15} aria-hidden="true" />
             <span>{t('nav.admin')}</span>
           </NavLink>
           <button type="button" className="nav-burger" onClick={() => setOpen(!open)} aria-expanded={open} aria-label={t('nav.menu')}>

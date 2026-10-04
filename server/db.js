@@ -213,9 +213,9 @@ export function summariseSessions(rows) {
 
 // ---------- Escalations ----------
 
-// Phone numbers are kept only while a call is pending: masked once the request is Resolved
-// (data minimisation, DPDP Act). Only signed-in counsellors can read them.
-export const maskPhone = (p) => (p ? String(p).replace(/\D/g, '').replace(/^(\d{2})\d+(\d{4})$/, '$1xxxx$2') : null)
+// Phone numbers are stored hidden (98xxxx3210): the prototype's dashboard is open to everyone
+// (data minimisation, DPDP Act). A real deployment would keep the full number for signed-in counsellors only.
+export const maskPhone = (p) => (p ? String(p).replace(/[^\dx]/g, '').replace(/^(\d{2})\d+(\d{4})$/, '$1xxxx$2') : null)
 
 // Short ticket numbers families can read out on the phone (no 0/O or 1/I mix-ups).
 const TICKET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -235,7 +235,7 @@ export function addEscalation(e) {
       d.prepare(
         `UPDATE escalations SET kind = ?, contact = ?, preferred_time = ?, woman = ?, lang = ?, topics = ?, summary = COALESCE(?, summary),
            status = 'Waiting', updated_at = ? WHERE id = ?`,
-      ).run(e.kind ?? 'call', e.phone ? String(e.phone).replace(/\D/g, '') : null, e.time ?? null, e.woman || open.woman ? 1 : 0, e.lang ?? open.lang,
+      ).run(e.kind ?? 'call', e.phone ? String(e.phone).replace(/[^\dx]/g, '') : null, e.time ?? null, e.woman || open.woman ? 1 : 0, e.lang ?? open.lang,
         JSON.stringify(topics), e.summary ? JSON.stringify(e.summary) : null, Date.now(), open.id)
       return open.id
     }
@@ -248,7 +248,7 @@ export function addEscalation(e) {
     )
     .run(
       id, Date.now(), e.sessionId ?? null, e.kind ?? 'call', e.district ?? null, e.mandal ?? null, e.lang ?? null,
-      JSON.stringify(e.reasons ?? []), e.who ?? null, e.woman ? 1 : 0, 'Waiting', e.phone ? String(e.phone).replace(/\D/g, '') : null, e.time ?? null,
+      JSON.stringify(e.reasons ?? []), e.who ?? null, e.woman ? 1 : 0, 'Waiting', e.phone ? String(e.phone).replace(/[^\dx]/g, '') : null, e.time ?? null,
       JSON.stringify(e.topics ?? []), JSON.stringify(e.summary ?? null), Date.now(),
     )
   return id

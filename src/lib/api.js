@@ -39,7 +39,6 @@ export async function connectBackend() {
       provider: health.provider,
       providerLabel: health.providerLabel,
       model: health.model,
-      adminProtected: health.adminProtected,
       storage: health.storage,
       stats: outcomes.stats,
       verifiedAt: outcomes.verifiedAt,
@@ -124,6 +123,3 @@ export const requestStatus = (id) => call(`/escalations/${encodeURIComponent(id)
 export const updateEscalation = (id, patch) => call(`/escalations/${encodeURIComponent(id)}`, patch, 'PATCH')
 
 // ---------- Admin sign-in ----------
-export const adminMe = () => call('/admin/me')
-export const adminLogin = (password) => call('/admin/login', { password })
-export const adminLogout = () => call('/admin/logout', {})

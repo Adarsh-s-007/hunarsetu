@@ -80,7 +80,7 @@ export async function liveAnalytics() {
 }
 
 // ---------- Call-back requests ----------
-const clean = (phone) => (phone ? String(phone).replace(/\D/g, '') : null)
+const clean = (phone) => (phone ? String(phone).replace(/[^\dx]/g, '') : null)
 
 async function saveEscalation(row) {
   await one('SET', K.esc(row.id), JSON.stringify(row), 'EX', KEEP_SECONDS)
