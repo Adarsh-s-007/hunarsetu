@@ -1148,3 +1148,43 @@
     padding: 6px 9px;
   }
 }
+
+/* ---------- Dashboard map: the colour key sits under the map, never over a circle ---------- */
+.map-wrap .map-legend {
+  position: static;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  border-radius: 0;
+  box-shadow: none;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 0.85rem;
+}
+.map-wrap .map-legend .ramp-ends {
+  display: flex;
+  gap: 8px;
+}
+@media (max-width: 640px) {
+  .map {
+    height: 380px;
+  }
+}
+.map-wrap .map-legend .ramp-ends {
+  align-items: center;
+}
+/* In the key, a plain colour dot stands for a kind of place (the numbers belong to the list). */
+.places-map-key .map-pin.is-kind > span {
+  width: 14px;
+  height: 14px;
+}
+
+/* Keep Leaflet's own layers (z-index up to 1000) inside the map, so the map never covers
+   the sticky top bar or the dashboard's section menu while scrolling. */
+.map-wrap,
+.places-map {
+  position: relative;
+  isolation: isolate;
+  z-index: 0;
+}

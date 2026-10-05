@@ -8,11 +8,22 @@ import { nearbyPlaces } from '../lib/api.js'
 
 const KIND_COLOR = { iti: '#1d6a69', polytechnic: '#2a78d6', skill: '#d9851a' }
 
+// Zoom so every pin is on screen, at any screen width (and again when the map is resized).
 function FitAll({ points }) {
   const map = useMap()
+  const key = points.map((p) => p.join(',')).join(';')
   useEffect(() => {
-    if (points.length) map.fitBounds(points, { padding: [28, 28], maxZoom: 13 })
-  }, [map, points.map((p) => p.join(',')).join(';')]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!points.length) return
+    const fit = () => {
+      map.invalidateSize()
+      map.fitBounds(points, { padding: [32, 32], maxZoom: 13, animate: false })
+    }
+    fit()
+    // The map can be created before its box has its final size: fit again whenever the box changes.
+    const watch = new ResizeObserver(fit)
+    watch.observe(map.getContainer())
+    return () => watch.disconnect()
+  }, [map, key]) // eslint-disable-line react-hooks/exhaustive-deps
   return null
 }
 
@@ -24,10 +35,10 @@ function PlacesMap({ places, origin, fromFamily }) {
   const points = [[origin.lat, origin.lon], ...places.map((p) => [p.lat, p.lon])]
   return (
     <div className="places-map">
-      <MapContainer center={points[0]} zoom={11} scrollWheelZoom={false} className="map map-sm">
+      <MapContainer center={points[0]} zoom={11} zoomSnap={0.25} zoomDelta={0.5} scrollWheelZoom={false} className="map map-sm">
         <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" maxZoom={19} />
         <FitAll points={points} />
-        <Marker position={points[0]} icon={pin('<span>★</span>', 'is-origin')} zIndexOffset={1000}>
+        <Marker position={points[0]} icon={pin("<span>★</span>", "is-origin")} zIndexOffset={-500}>
           <Tooltip direction="top" offset={[0, -14]}>{t(fromFamily ? 'places.you' : 'places.town')}</Tooltip>
         </Marker>
         {places.map((p, i) => (
@@ -41,9 +52,9 @@ function PlacesMap({ places, origin, fromFamily }) {
       <p className="places-map-key">
         {[
           ['is-origin', '#c8553d', '★', t(fromFamily ? 'places.you' : 'places.town')],
-          ['', KIND_COLOR.iti, '1', t('places.iti')],
-          ['', KIND_COLOR.polytechnic, '2', t('places.polytechnic')],
-          ['', KIND_COLOR.skill, '3', t('places.skill')],
+          ['is-kind', KIND_COLOR.iti, '', t('places.iti')],
+          ['is-kind', KIND_COLOR.polytechnic, '', t('places.polytechnic')],
+          ['is-kind', KIND_COLOR.skill, '', t('places.skill')],
         ].map(([cls, bg, mark, label]) => (
           <span key={label} className="key-item">
             <span className={`map-pin ${cls}`}>

@@ -146,7 +146,7 @@ async function fetchPlaces(districtId) {
   for (const host of OVERPASS) {
     try {
       const data = await getJson(host, {
-        timeout: 35_000,
+        timeout: process.env.VERCEL ? 25_000 : 35_000, // two mirrors must fit in Vercel's 60 s limit
         init: { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: `data=${encodeURIComponent(query)}` },
       })
       const seen = []
@@ -189,7 +189,15 @@ export async function trainingPlaces(districtId, near) {
   const [s, w, n, e] = pad(getDistrict(districtId).bbox, 0.15)
   if (near && !(near.lat >= s && near.lat <= n && near.lon >= w && near.lon <= e)) near = null
   const from = near ?? { lat: getDistrict(districtId).center[0], lon: getDistrict(districtId).center[1] }
-  const withDistance = places
+  // The same campus is sometimes mapped twice under different names ("Govt Polytechnic Clg Wgl"
+  // and "Government Polytechnic College"): keep one place per kind within 150 m, with the fuller name.
+  const unique = []
+  for (const p of places) {
+    const twin = unique.find((u) => u.kind === p.kind && km(u, p) < 0.15)
+    if (!twin) unique.push(p)
+    else if (p.name.length > twin.name.length) unique[unique.indexOf(twin)] = p
+  }
+  const withDistance = unique
     .map((p) => ({ ...p, km: Math.round(km(from, p) * 10) / 10, directions: `https://www.openstreetmap.org/directions?route=${from.lat}%2C${from.lon}%3B${p.lat}%2C${p.lon}` }))
     .sort((a, b) => (a.kind === b.kind ? a.km - b.km : a.kind === 'iti' ? -1 : b.kind === 'iti' ? 1 : a.km - b.km))
   return { places: withDistance.slice(0, 12), available: true, stale, from: near ? 'family' : 'district centre', origin: from, source: 'OpenStreetMap' }

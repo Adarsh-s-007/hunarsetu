@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { MapContainer, TileLayer, CircleMarker, Tooltip } from 'react-leaflet'
+import { MapContainer, TileLayer, CircleMarker, Tooltip, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { ArrowUp, ArrowDown, Siren, Download, Flag, Radio, Info } from 'lucide-react'
 import { useApp } from '../AppContext'
@@ -30,6 +30,35 @@ const ink = (hex) => {
 const METRICS = {
   resistance: { label: 'How often families say no', ramp: ORANGE, lo: 25, hi: 80, fmt: (v) => `${v} / 100`, legend: ['Rarely', 'Very often'] },
   consent: { label: 'Families who said yes', ramp: BLUE, lo: 35, hi: 75, fmt: (v) => `${v}%`, legend: ['35%', '75%'] },
+}
+
+// Zoom so every mandal is on screen, at any screen width (and again when the map is resized).
+const MANDAL_BOUNDS = MANDALS.map((m) => [m.lat, m.lng])
+function FitMandals() {
+  const map = useMap()
+  useEffect(() => {
+    const fit = () => {
+      map.invalidateSize()
+      map.fitBounds(MANDAL_BOUNDS, { padding: [28, 28], animate: false })
+    }
+    fit()
+    // Fit again whenever the map's box changes size (first layout, rotating a phone, resizing).
+    const watch = new ResizeObserver(fit)
+    watch.observe(map.getContainer())
+    return () => watch.disconnect()
+  }, [map])
+  return null
+}
+
+// Phones get smaller circles so neighbouring mandals do not cover each other.
+function useNarrow() {
+  const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640)
+  useEffect(() => {
+    const on = () => setNarrow(window.innerWidth < 640)
+    window.addEventListener('resize', on)
+    return () => window.removeEventListener('resize', on)
+  }, [])
+  return narrow
 }
 
 function Kpi({ label, value, delta, good, sub }) {
@@ -492,6 +521,7 @@ export default function Admin() {
   const sel = MANDALS.find((m) => m.id === selected)
   const mix = mandalMix(sel)
   const maxSessions = Math.max(...MANDALS.map((m) => m.sessions))
+  const narrow = useNarrow()
 
 
   const exportCsv = () => {
@@ -598,14 +628,15 @@ export default function Admin() {
           </div>
           <p className="section-note">Each circle is a mandal. A bigger circle means more families talked to us; the colour key is under the map. Tap a circle to see why.</p>
           <div className="map-wrap">
-            <MapContainer center={[18.0, 79.66]} zoom={10} scrollWheelZoom={false} className="map">
+            <MapContainer center={[18.0, 79.66]} zoom={10} zoomSnap={0.25} zoomDelta={0.5} scrollWheelZoom={false} className="map">
+              <FitMandals />
               {/* OpenStreetMap tiles need no API key; greyed in CSS so the data circles stand out. */}
               <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" maxZoom={19} />
               {MANDALS.map((m) => (
                 <CircleMarker
                   key={`${m.id}-${metric}-${m.id === selected}`}
                   center={[m.lat, m.lng]}
-                  radius={8 + 14 * Math.sqrt(m.sessions / maxSessions)}
+                  radius={(narrow ? 6 : 8) + (narrow ? 9 : 14) * Math.sqrt(m.sessions / maxSessions)}
                   pathOptions={{ color: m.id === selected ? '#132424' : '#ffffff', weight: m.id === selected ? 3 : 2, fillColor: step(M.ramp, m[metric], M.lo, M.hi), fillOpacity: 0.92 }}
                   eventHandlers={{ click: () => setSelected(m.id) }}
                 >
@@ -626,16 +657,17 @@ export default function Admin() {
               ))}
             </MapContainer>
             <div className="map-legend">
-              <span>{M.label}</span>
-              <span className="ramp">
-                {M.ramp.map((c) => (
-                  <i key={c} style={{ background: c }} />
-                ))}
-              </span>
+              <span>{M.label}:</span>
               <span className="ramp-ends">
                 <small>{M.legend[0]}</small>
+                <span className="ramp">
+                  {M.ramp.map((c) => (
+                    <i key={c} style={{ background: c }} />
+                  ))}
+                </span>
                 <small>{M.legend[1]}</small>
               </span>
+              <small className="map-legend-size">Bigger circle = more families</small>
             </div>
           </div>
           <div className="rank">
